@@ -217,42 +217,23 @@ function SafetyCheckboxes({ selected = [], onToggle }) {
         const checked = (selected || []).includes(item);
 
         return (
-          <button
+          <label
             key={item}
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle(item);
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle(item);
-            }}
-            className="relative z-10 w-full rounded-xl border px-4 py-4 text-left text-sm active:scale-[0.99]"
+            className="flex items-center gap-3 rounded-xl border px-4 py-4 text-sm"
             style={{
               borderColor: checked ? "#0DACBA" : "#D4CAAE",
               background: checked ? "rgba(13,172,186,0.07)" : "white",
               color: "#456779",
-              WebkitTapHighlightColor: "transparent",
-              touchAction: "manipulation",
             }}
           >
-            <div className="pointer-events-none flex items-center gap-3">
-              <span
-                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border text-xs font-bold text-white"
-                style={{
-                  borderColor: checked ? "#0DACBA" : "#D4CAAE",
-                  background: checked ? "#0DACBA" : "transparent",
-                }}
-              >
-                {checked ? "✓" : ""}
-              </span>
-
-              <span className="leading-snug">{item}</span>
-            </div>
-          </button>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => onToggle(item)}
+              className="h-5 w-5"
+            />
+            <span>{item}</span>
+          </label>
         );
       })}
     </div>
