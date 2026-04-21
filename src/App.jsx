@@ -1,5 +1,30 @@
 import { useMemo, useState } from "react";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycby0dbq9PDsbXN9z_Psv9yjCLGb14YYqGMO4kNVDtgLNJWY0o0sK_X5OUECbEzg-gdBO/exec";
 
+async function sendToSheets(data) {
+  try {
+    const res = await fetch(SHEETS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await res.json();
+    console.log("Sheets response:", result);
+
+    if (result.success) {
+      alert("Saved successfully");
+    } else {
+      alert("Save failed");
+      console.error(result);
+    }
+  } catch (err) {
+    console.error("Error sending to Sheets:", err);
+    alert("Error sending data");
+  }
+}
 // ─── Brand colours from Te Whare Ruruhau o Meri Trust guidelines ─────────────
 // Primary:  #95C43F (green), #0DACBA (teal)
 // Support:  #F37128 (orange), #456779 (steel blue), #F2F2EA (off-white), #D4CAAE (sand)
@@ -185,32 +210,49 @@ function EmojiQuestion({ icon, title, description, value, onChange }) {
 // ─── Safety help checkboxes ───────────────────────────────────────────────────
 const safetyOptions = ["People", "Clear boundaries", "Support services", "Culture and connection", "Environment", "Other"];
 
-function SafetyCheckboxes({ selected, onToggle }) {
+function SafetyCheckboxes({ selected = [], onToggle }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {safetyOptions.map((item) => {
-        const checked = selected.includes(item);
+        const checked = (selected || []).includes(item);
+
         return (
-          <label
+          <button
             key={item}
-            className="flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-3 text-sm transition-all"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggle(item);
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggle(item);
+            }}
+            className="relative z-10 w-full rounded-xl border px-4 py-4 text-left text-sm active:scale-[0.99]"
             style={{
               borderColor: checked ? "#0DACBA" : "#D4CAAE",
               background: checked ? "rgba(13,172,186,0.07)" : "white",
-              color: checked ? "#0DACBA" : "#456779",
+              color: "#456779",
+              WebkitTapHighlightColor: "transparent",
+              touchAction: "manipulation",
             }}
           >
-            <span
-              className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-white transition"
-              style={{
-                borderColor: checked ? "#0DACBA" : "#D4CAAE",
-                background: checked ? "#0DACBA" : "transparent",
-              }}
-            >
-              {checked && <span className="text-[10px] leading-none">✓</span>}
-            </span>
-            <span className="text-xs font-semibold leading-tight">{item}</span>
-          </label>
+            <div className="pointer-events-none flex items-center gap-3">
+              <span
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border text-xs font-bold text-white"
+                style={{
+                  borderColor: checked ? "#0DACBA" : "#D4CAAE",
+                  background: checked ? "#0DACBA" : "transparent",
+                }}
+              >
+                {checked ? "✓" : ""}
+              </span>
+
+              <span className="leading-snug">{item}</span>
+            </div>
+          </button>
         );
       })}
     </div>
@@ -901,9 +943,16 @@ function StepSteps({ form, setField, onNext, onBack }) {
 }
 
 function StepSafety({ form, setField, onNext, onBack }) {
-  const toggleSafetyHelp = (item) => {
-    setField("safetyHelp", form.safetyHelp.includes(item) ? form.safetyHelp.filter((i) => i !== item) : [...form.safetyHelp, item]);
-  };
+const toggleSafetyHelp = (item) => {
+  const current = form.safetyHelp || [];
+
+  setField(
+    "safetyHelp",
+    current.includes(item)
+      ? current.filter((i) => i !== item)
+      : [...current, item]
+  );
+};
   return (
     <div className="space-y-6">
       <SectionHeading eyebrow="Step 4" title="Your community & safety"
@@ -919,10 +968,18 @@ function StepSafety({ form, setField, onNext, onBack }) {
           <FieldLabel>Where do you feel most safe?</FieldLabel>
           <Select value={form.safePlace} onChange={(v) => setField("safePlace", v)} options={["Home", "Work", "Community spaces", "Online", "Other"]} />
         </div>
-        <div className="p-5 space-y-2">
-          <FieldLabel helper="Select all that apply.">What helps create safety?</FieldLabel>
-          <SafetyCheckboxes selected={form.safetyHelp} onToggle={toggleSafetyHelp} />
-        </div>
+        <div className="p-5 space-y-3">
+  <FieldLabel helper="Select all that apply.">
+    What helps create safety?
+  </FieldLabel>
+
+  <div className="relative z-10">
+    <SafetyCheckboxes
+      selected={form.safetyHelp || []}
+      onToggle={toggleSafetyHelp}
+    />
+  </div>
+</div>
         <div className="p-5 space-y-1.5">
           <FieldLabel>What is one thing that would improve safety in your community?</FieldLabel>
           <Textarea value={form.improveSafety} onChange={(v) => setField("improveSafety", v)} placeholder="Your whakaaro here…" />
@@ -969,6 +1026,24 @@ function StepOrganisation({ form, setField, onNext, onBack }) {
 
 function StepPrize({ form, setField, onBack }) {
   const [submitted, setSubmitted] = useState(false);
+
+  async function handleFinalSubmit() {
+    if (!form.name || !form.contact || !form.consent) {
+      alert("Please enter your name, contact details, and tick the consent box.");
+      return;
+    }
+
+    await sendToSheets({
+      respondentType: form.respondentType || "",
+      hauoraTinana: form.hauoraTinana || "",
+      hauoraHinengaro: form.hauoraHinengaro || "",
+      hauoraWairua: form.hauoraWairua || "",
+      hauoraWhanau: form.hauoraWhanau || "",
+      answers: form
+    });
+
+    setSubmitted(true);
+  }
   if (submitted) {
     return (
       <div className="flex flex-col items-center py-12 text-center">
@@ -1023,7 +1098,7 @@ function StepPrize({ form, setField, onBack }) {
       <div className="flex flex-col gap-3 sm:flex-row">
         <button type="button" onClick={onBack} className="rounded-xl border px-5 py-3 text-sm font-bold transition"
           style={{ borderColor: "#D4CAAE", color: "#456779" }}>← Back</button>
-        <button type="button" onClick={() => setSubmitted(true)}
+        <button type="button" onClick={handleFinalSubmit}
           className="flex-1 rounded-xl px-5 py-3.5 text-sm font-bold text-white transition"
           style={{ background: "#95C43F", boxShadow: "0 4px 14px rgba(149,196,63,0.3)" }}>
           {form.name && form.contact && form.consent ? "Submit survey & enter draw 🎉" : "Submit survey (skip draw)"}
